@@ -1,0 +1,64 @@
+{
+  "metadata": {
+    "figure_type": "geographical_analysis",
+    "title": "Geographical Analysis - Music Preferences by Country",
+    "subplot_layout": "2x2",
+    "total_subplots": 4,
+    "subplot_info": {
+      "0,0": {
+        "type": "barh",
+        "title": "Top 15 Countries by Song Count",
+        "xlabel": "Number of Songs"
+      },
+      "0,1": {
+        "type": "pie",
+        "title": "Country Distribution (Top 10 + Others)"
+      },
+      "1,0": {
+        "type": "hist",
+        "title": "Distribution of Songs per Country",
+        "xlabel": "Number of Songs",
+        "ylabel": "Number of Countries"
+      },
+      "1,1": {
+        "type": "barh",
+        "title": "Top 15 Countries by Unique Artists",
+        "xlabel": "Number of Unique Artists"
+      }
+    }
+  },
+  "country_counts": {
+    "DO": 29176,
+    "IT": 29174,
+    "NI": 29170,
+    "PL": 29164,
+    "HU": 29163,
+    "HN": 29162,
+    "SV": 29162,
+    "TH": 29161,
+    "CR": 29161,
+    "KZ": 29161,
+    "EG": 29161,
+    "CZ": 29161,
+    "FI": 29160,
+    "FR": 29159,
+    "PT": 29159
+  },
+  "unique_artists_per_country": {
+    "LU": 877,
+    "DE": 801,
+    "CH": 690,
+    "LV": 677,
+    "IS": 676,
+    "AT": 674,
+    "EE": 656,
+    "IT": 639,
+    "DO": 600,
+    "PL": 592,
+    "FI": 590,
+    "ZA": 589,
+    "GR": 566,
+    "NO": 564,
+    "BR": 537
+  }
+}

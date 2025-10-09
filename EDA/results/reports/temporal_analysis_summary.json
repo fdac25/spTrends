@@ -1,0 +1,14 @@
+{
+  "date_range_start": "2023-10-18 00:00:00",
+  "date_range_end": "2025-06-11 00:00:00",
+  "total_days": 602,
+  "average_songs_per_day": 3619.753001715266,
+  "peak_day": "2024-03-16",
+  "peak_day_count": 3942,
+  "daily_counts_summary": {
+    "mean": 3619.753001715266,
+    "std": 138.18898877617235,
+    "min": 1850,
+    "max": 3942
+  }
+}

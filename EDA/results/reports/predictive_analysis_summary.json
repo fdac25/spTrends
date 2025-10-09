@@ -1,0 +1,47 @@
+{
+  "best_model": "Random Forest",
+  "model_performance": {
+    "Linear Regression": {
+      "MSE": 185.0788564325289,
+      "RMSE": 13.604369020007098,
+      "MAE": 11.643503311067398,
+      "R2": 0.11056949051372522,
+      "CV_R2_Mean": 0.11018282668772761,
+      "CV_R2_Std": 0.0006088013499932636
+    },
+    "Random Forest": {
+      "MSE": 123.12540694471481,
+      "RMSE": 11.096188847740237,
+      "MAE": 8.60770456753016,
+      "R2": 0.40829819494013686,
+      "CV_R2_Mean": 0.4086423707260346,
+      "CV_R2_Std": 0.0008897113611980878
+    }
+  },
+  "target_variable": "daily_rank",
+  "features_used": [
+    "daily_movement",
+    "weekly_movement",
+    "popularity",
+    "duration_ms",
+    "danceability",
+    "energy",
+    "key",
+    "loudness",
+    "mode",
+    "speechiness",
+    "acousticness",
+    "instrumentalness",
+    "liveness",
+    "valence",
+    "tempo",
+    "time_signature",
+    "week",
+    "month",
+    "year"
+  ],
+  "train_test_split": {
+    "train_size": 1688252,
+    "test_size": 422064
+  }
+}

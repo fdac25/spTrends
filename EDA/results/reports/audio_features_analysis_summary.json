@@ -1,0 +1,65 @@
+{
+  "available_features": [
+    "danceability",
+    "energy",
+    "key",
+    "loudness",
+    "mode",
+    "speechiness",
+    "acousticness",
+    "instrumentalness",
+    "liveness",
+    "valence",
+    "tempo",
+    "duration_ms",
+    "time_signature"
+  ],
+  "number_of_features": 13,
+  "strongest_correlations": [
+    {
+      "feature1": "energy",
+      "feature2": "loudness",
+      "correlation": 0.6530812472720516
+    },
+    {
+      "feature1": "energy",
+      "feature2": "acousticness",
+      "correlation": -0.5215635726508241
+    },
+    {
+      "feature1": "loudness",
+      "feature2": "instrumentalness",
+      "correlation": -0.49356122465833485
+    },
+    {
+      "feature1": "danceability",
+      "feature2": "valence",
+      "correlation": 0.4353271001292708
+    },
+    {
+      "feature1": "energy",
+      "feature2": "valence",
+      "correlation": 0.382720636579254
+    },
+    {
+      "feature1": "loudness",
+      "feature2": "acousticness",
+      "correlation": -0.35724494863618644
+    },
+    {
+      "feature1": "danceability",
+      "feature2": "loudness",
+      "correlation": 0.3242115528133214
+    },
+    {
+      "feature1": "loudness",
+      "feature2": "valence",
+      "correlation": 0.31831179928985265
+    }
+  ],
+  "correlation_matrix_summary": {
+    "mean_correlation": -0.00786272834929773,
+    "max_correlation": 0.6530812472720516,
+    "min_correlation": -0.5215635726508241
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "total_songs": 2110316,
+  "explicit_songs_count": 689287,
+  "explicit_songs_percentage": 32.66273866093988,
+  "non_explicit_songs_count": 1421029,
+  "non_explicit_songs_percentage": 67.33726133906012,
+  "explicitness_groups_summary": {
+    "mean": {
+      "False": 25.73964922601861,
+      "True": 24.984578267107896
+    },
+    "median": {
+      "False": 26.0,
+      "True": 25.0
+    },
+    "std": {
+      "False": 14.406525022045798,
+      "True": 14.461982364857299
+    },
+    "count": {
+      "False": 1421029,
+      "True": 689287
+    }
+  },
+  "t_test_p_value": 1.837582292334306e-278,
+  "mann_whitney_p_value": 2.1522037301969757e-278,
+  "group1_mean": 25.73964922601861,
+  "group2_mean": 24.984578267107896,
+  "effect_size_cohens_d": 0.052310952939186986
+}

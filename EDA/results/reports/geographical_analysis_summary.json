@@ -1,0 +1,19 @@
+{
+  "total_countries": 72,
+  "most_active_country": "DO",
+  "most_active_country_songs": 29176,
+  "average_songs_per_country": 29163.6,
+  "countries_over_1000_songs": 15,
+  "top_10_countries": {
+    "DO": 29176,
+    "IT": 29174,
+    "NI": 29170,
+    "PL": 29164,
+    "HU": 29163,
+    "HN": 29162,
+    "SV": 29162,
+    "TH": 29161,
+    "CR": 29161,
+    "KZ": 29161
+  }
+}

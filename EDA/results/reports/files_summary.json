@@ -1,0 +1,67 @@
+{
+  "analysis_timestamp": "2025-10-03T17:07:50.995120",
+  "output_directory": "EDA/results",
+  "saved_files": {
+    "figures": {
+      "basic_analysis": [
+        "basic_data_overview.png"
+      ],
+      "temporal": [
+        "temporal_analysis.png"
+      ],
+      "geographical": [
+        "geographical_analysis.png"
+      ],
+      "audio_features": [
+        "audio_features_analysis.png"
+      ],
+      "feature_selection": [
+        "feature_selection_analysis.png"
+      ],
+      "predictive": [
+        "predictive_analysis.png"
+      ],
+      "genre_artist": [
+        "genre_artist_analysis.png"
+      ],
+      "explicitness": [
+        "explicitness_analysis.png"
+      ],
+      "dashboard": [
+        "comprehensive_dashboard.png"
+      ]
+    },
+    "tables": [
+      "missing_data_analysis.csv",
+      "daily_song_counts.csv",
+      "weekly_song_counts.csv",
+      "monthly_song_counts.csv",
+      "yearly_song_counts.csv",
+      "country_song_counts.csv",
+      "audio_features_correlation_matrix.csv",
+      "top_artists.csv",
+      "top_genres.csv",
+      "top_tracks.csv",
+      "explicitness_groups_analysis.csv",
+      "model_predictions.csv"
+    ],
+    "models": [
+      "linear_regression_model.pkl",
+      "random_forest_model.pkl"
+    ],
+    "reports": [
+      "basic_data_summary.json",
+      "temporal_analysis_summary.json",
+      "geographical_analysis_summary.json",
+      "audio_features_analysis_summary.json",
+      "feature_selection_summary.json",
+      "predictive_analysis_summary.json",
+      "genre_artist_analysis_summary.json",
+      "explicitness_analysis_summary.json",
+      "comprehensive_eda_summary.txt"
+    ],
+    "data": [
+      "processed_spotify_dataset.csv"
+    ]
+  }
+}

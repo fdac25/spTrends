@@ -1,0 +1,54 @@
+{
+  "last_update": "2025-10-03T17:07:19.606830",
+  "dataset_hash": "3498d32b65f5cea0952752a6cc404503",
+  "completed_analyses": [
+    "basic_data_overview",
+    "temporal_analysis",
+    "geographical_analysis",
+    "audio_features_analysis",
+    "feature_selection_analysis",
+    "predictive_analysis",
+    "genre_artist_analysis",
+    "explicitness_analysis",
+    "comprehensive_dashboard"
+  ],
+  "analysis_times": {
+    "basic_data_overview": {
+      "timestamp": "2025-10-03T16:58:58.803273",
+      "duration_seconds": 64.909823179245
+    },
+    "temporal_analysis": {
+      "timestamp": "2025-10-03T15:02:49.635175",
+      "duration_seconds": 4.670406103134155
+    },
+    "geographical_analysis": {
+      "timestamp": "2025-10-03T15:02:58.235702",
+      "duration_seconds": 7.486392021179199
+    },
+    "audio_features_analysis": {
+      "timestamp": "2025-10-03T15:03:23.409113",
+      "duration_seconds": 24.055229902267456
+    },
+    "feature_selection_analysis": {
+      "timestamp": "2025-10-03T16:59:27.603087",
+      "duration_seconds": 26.618765830993652
+    },
+    "predictive_analysis": {
+      "timestamp": "2025-10-03T17:06:57.592351",
+      "duration_seconds": 7214.153216123581
+    },
+    "genre_artist_analysis": {
+      "timestamp": "2025-10-03T17:07:02.514443",
+      "duration_seconds": 3.829841136932373
+    },
+    "explicitness_analysis": {
+      "timestamp": "2025-10-03T17:07:12.176975",
+      "duration_seconds": 8.570754766464233
+    },
+    "comprehensive_dashboard": {
+      "timestamp": "2025-10-03T17:07:19.606815",
+      "duration_seconds": 6.252376079559326
+    }
+  },
+  "output_directory": "EDA/results"
+}

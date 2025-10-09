@@ -1,0 +1,52 @@
+{
+  "total_features_analyzed": 16,
+  "target_variable": "daily_rank",
+  "selectkbest_top_features": [
+    "daily_movement",
+    "weekly_movement",
+    "popularity",
+    "duration_ms",
+    "danceability",
+    "energy",
+    "loudness",
+    "liveness",
+    "valence",
+    "time_signature"
+  ],
+  "rfe_top_features": [
+    "daily_movement",
+    "weekly_movement",
+    "popularity",
+    "duration_ms",
+    "danceability",
+    "energy",
+    "loudness",
+    "speechiness",
+    "liveness",
+    "tempo"
+  ],
+  "random_forest_top_features": [
+    "energy",
+    "valence",
+    "liveness",
+    "acousticness",
+    "tempo",
+    "speechiness",
+    "duration_ms",
+    "popularity",
+    "daily_movement",
+    "weekly_movement"
+  ],
+  "correlation_top_features": [
+    "weekly_movement",
+    "daily_movement",
+    "popularity",
+    "time_signature",
+    "liveness",
+    "valence",
+    "duration_ms",
+    "danceability",
+    "energy",
+    "loudness"
+  ]
+}
