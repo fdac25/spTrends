@@ -860,54 +860,135 @@ function renderNetworkChart(chartKey, data) {
     const centerY = canvas.height / 2;
     const radius = Math.min(canvas.width, canvas.height) / 2.5; // Smaller radius
     
-    // Draw nodes
-    data.features.forEach((feature, index) => {
-        const angle = (2 * Math.PI * index) / data.features.length;
-        const x = centerX + radius * Math.cos(angle);
-        const y = centerY + radius * Math.sin(angle);
-        
-        // Draw smaller node
-        ctx.beginPath();
-        ctx.arc(x, y, 20, 0, 2 * Math.PI); // Smaller radius
-        ctx.fillStyle = getChartColor(index);
-        ctx.fill();
-        ctx.strokeStyle = '#fff';
-        ctx.lineWidth = 2;
-        ctx.stroke();
-        
-        // Draw label
-        ctx.fillStyle = '#000';
-        ctx.font = 'bold 13px Arial'; // Slightly smaller, bold font
-        ctx.textAlign = 'center';
-        ctx.fillText(feature, x, y + 3);
-    });
-    
-    // Draw connections
-    data.correlations.forEach(corr => {
+    // Store correlation data for hover detection
+    const correlations = data.correlations.map(corr => {
         const feature1Index = data.features.indexOf(corr.feature1);
         const feature2Index = data.features.indexOf(corr.feature2);
         
         const angle1 = (2 * Math.PI * feature1Index) / data.features.length;
         const angle2 = (2 * Math.PI * feature2Index) / data.features.length;
         
-        const x1 = centerX + radius * Math.cos(angle1);
-        const y1 = centerY + radius * Math.sin(angle1);
-        const x2 = centerX + radius * Math.cos(angle2);
-        const y2 = centerY + radius * Math.sin(angle2);
-        
-        // High-resolution line width based on correlation strength
-        const lineWidth = Math.max(1, Math.abs(corr.correlation) * 3); // Thinner, cleaner lines
-        ctx.lineWidth = lineWidth;
-        ctx.strokeStyle = corr.correlation > 0 ? '#2ecc71' : '#e74c3c';
-        ctx.globalAlpha = Math.max(0.5, Math.abs(corr.correlation));
-        
-        ctx.beginPath();
-        ctx.moveTo(x1, y1);
-        ctx.lineTo(x2, y2);
-        ctx.stroke();
-        
-        ctx.globalAlpha = 1;
+        return {
+            ...corr,
+            x1: centerX + radius * Math.cos(angle1),
+            y1: centerY + radius * Math.sin(angle1),
+            x2: centerX + radius * Math.cos(angle2),
+            y2: centerY + radius * Math.sin(angle2),
+            lineWidth: Math.max(1, Math.abs(corr.correlation) * 3)
+        };
     });
+    
+    // Function to draw the network
+    function drawNetwork() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        
+        // Draw connections first (so nodes appear on top)
+        correlations.forEach(corr => {
+            ctx.lineWidth = corr.lineWidth;
+            ctx.strokeStyle = corr.correlation > 0 ? '#2ecc71' : '#e74c3c';
+            ctx.globalAlpha = Math.max(0.5, Math.abs(corr.correlation));
+            
+            ctx.beginPath();
+            ctx.moveTo(corr.x1, corr.y1);
+            ctx.lineTo(corr.x2, corr.y2);
+            ctx.stroke();
+            
+            ctx.globalAlpha = 1;
+        });
+        
+        // Draw nodes
+        data.features.forEach((feature, index) => {
+            const angle = (2 * Math.PI * index) / data.features.length;
+            const x = centerX + radius * Math.cos(angle);
+            const y = centerY + radius * Math.sin(angle);
+            
+            // Draw smaller node
+            ctx.beginPath();
+            ctx.arc(x, y, 20, 0, 2 * Math.PI); // Smaller radius
+            ctx.fillStyle = getChartColor(index);
+            ctx.fill();
+            ctx.strokeStyle = '#fff';
+            ctx.lineWidth = 2;
+            ctx.stroke();
+            
+            // Draw label
+            ctx.fillStyle = '#000';
+            ctx.font = 'bold 13px Arial'; // Slightly smaller, bold font
+            ctx.textAlign = 'center';
+            ctx.fillText(feature, x, y + 3);
+        });
+    }
+    
+    // Function to check if point is near a line
+    function isPointNearLine(mouseX, mouseY, line) {
+        const dx = line.x2 - line.x1;
+        const dy = line.y2 - line.y1;
+        const length = Math.sqrt(dx * dx + dy * dy);
+        
+        if (length === 0) return false;
+        
+        const t = Math.max(0, Math.min(1, ((mouseX - line.x1) * dx + (mouseY - line.y1) * dy) / (length * length)));
+        const projectionX = line.x1 + t * dx;
+        const projectionY = line.y1 + t * dy;
+        
+        const distance = Math.sqrt((mouseX - projectionX) ** 2 + (mouseY - projectionY) ** 2);
+        return distance <= 10; // 10 pixel tolerance
+    }
+    
+    // Mouse move handler for hover effects
+    canvas.addEventListener('mousemove', (e) => {
+        const rect = canvas.getBoundingClientRect();
+        const mouseX = e.clientX - rect.left;
+        const mouseY = e.clientY - rect.top;
+        
+        let hoveredCorrelation = null;
+        for (const corr of correlations) {
+            if (isPointNearLine(mouseX, mouseY, corr)) {
+                hoveredCorrelation = corr;
+                break;
+            }
+        }
+        
+        // Redraw with hover effect
+        drawNetwork();
+        
+        if (hoveredCorrelation) {
+            // Highlight the hovered connection
+            ctx.lineWidth = hoveredCorrelation.lineWidth + 2;
+            ctx.strokeStyle = hoveredCorrelation.correlation > 0 ? '#27ae60' : '#c0392b';
+            ctx.globalAlpha = 1;
+            
+            ctx.beginPath();
+            ctx.moveTo(hoveredCorrelation.x1, hoveredCorrelation.y1);
+            ctx.lineTo(hoveredCorrelation.x2, hoveredCorrelation.y2);
+            ctx.stroke();
+            
+            // Draw tooltip
+            const tooltipX = (hoveredCorrelation.x1 + hoveredCorrelation.x2) / 2;
+            const tooltipY = (hoveredCorrelation.y1 + hoveredCorrelation.y2) / 2;
+            
+            // Tooltip background
+            const correlationText = `${hoveredCorrelation.feature1} ↔ ${hoveredCorrelation.feature2}: ${hoveredCorrelation.correlation.toFixed(3)}`;
+            ctx.font = '12px Arial';
+            const textWidth = ctx.measureText(correlationText).width;
+            
+            ctx.fillStyle = 'rgba(0, 0, 0, 0.8)';
+            ctx.fillRect(tooltipX - textWidth/2 - 5, tooltipY - 20, textWidth + 10, 20);
+            
+            // Tooltip text
+            ctx.fillStyle = '#fff';
+            ctx.textAlign = 'center';
+            ctx.fillText(correlationText, tooltipX, tooltipY - 5);
+            
+            // Change cursor
+            canvas.style.cursor = 'pointer';
+        } else {
+            canvas.style.cursor = 'default';
+        }
+    });
+    
+    // Initial draw
+    drawNetwork();
 }
 
 // Helper functions
@@ -1149,7 +1230,6 @@ async function updateCharts() {
     }
     
     const chartsData = result.data;
-    console.log('✅ Loaded insightful charts:', Object.keys(chartsData));
     
     // Render the new insightful charts
     renderInsightfulCharts(chartsData);
