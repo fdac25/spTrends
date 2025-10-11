@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Spotify Analytics Dashboard</title>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+  <!-- Chart.js for placeholder charts (ready to wire to real APIs later) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <script defer src="{{ url_for('static', filename='app.js') }}?v=20251003-1910"></script>
+</head>
+<body>
+  <aside class="sidebar">
+    <div class="logo">
+      <svg viewBox="0 0 24 24" aria-hidden="true" style="width: 24px; height: 24px;">
+        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" fill="currentColor"/>
+      </svg>
+      <span>Analytics Dashboard</span>
+    </div>
+<!-- ===== Filters ===== -->
+<div class="card panel" id="filters-panel">
+  <div class="panel-head">
+    <h2>Filters</h2>
+  </div>
+
+  <form id="filters" class="filters">
+    <label>Country (Hold Ctrl/Cmd to select multiple)
+      <select name="country" id="country" multiple size="5">
+        <!-- Options will be populated dynamically -->
+      </select>
+    </label>
+
+
+    <label>Genre
+      <select name="genre" id="genre">
+        <option value="">All</option>
+        <!-- Options will be populated dynamically -->
+      </select>
+    </label>
+
+    <label>Subgenre
+      <select name="subgenre" id="subgenre">
+        <option value="">All</option>
+        <!-- Options will be populated dynamically -->
+      </select>
+    </label>
+
+    <label>Language
+      <select name="language" id="language">
+        <option value="">All</option>
+        <!-- Options will be populated dynamically -->
+      </select>
+    </label>
+
+    <label>Popularity Range
+      <div class="range-wrap">
+        <input type="number" id="popMin" name="popMin" min="0" max="100" value="0" />
+        <span>to</span>
+        <input type="number" id="popMax" name="popMax" min="0" max="100" value="100" />
+      </div>
+    </label>
+
+    <label>Release Date Range
+      <div class="range-wrap">
+        <input type="date" id="releaseStart" name="releaseStart" />
+        <span>to</span>
+        <input type="date" id="releaseEnd" name="releaseEnd" />
+      </div>
+    </label>
+
+    <label>Growth Trend
+      <select name="trend" id="trend">
+        <option value="">All</option>
+        <option value="growing">Fastest Growing</option>
+        <option value="steady">Steady</option>
+        <option value="declining">Declining</option>
+      </select>
+    </label>
+
+    <div class="actions">
+      <button type="submit" class="btn-primary">Apply</button>
+      <button type="reset" class="btn-ghost" id="resetFilters">Reset</button>
+    </div>
+  </form>
+</div>
+
+  </aside>
+
+  <header class="topbar">
+    <h1>Spotify Song Analysis</h1>
+    <nav class="top-nav">
+      <a href="#" class="active">Overview</a>
+      <a href="#">More Info</a>
+      <a href="#">Settings</a>
+    </nav>
+  </header>
+
+  <main class="page">
+    <section class="kpis">
+      <div class="card kpi"><div class="kpi-label">Total Tracks</div><div class="kpi-value">{{ kpis.total_tracks }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Avg Energy</div><div class="kpi-value">{{ kpis.avg_energy }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Avg Danceability</div><div class="kpi-value">{{ kpis.avg_danceability }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Countries Covered</div><div class="kpi-value">{{ kpis.countries_covered }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Last Snapshot</div><div class="kpi-value">{{ kpis.last_ingest }}</div></div>
+    </section>
+
+    <div id="filter-status" style="padding: 10px; background: var(--card); margin: 10px 0; border-radius: var(--radius); color: var(--text);">
+      Loading filters...
+    </div>
+
+    <section id="charts-container" class="grid"></section>
+
+    <!-- Embed manifest safely as JSON the JS can read -->
+    <script id="manifest-json" type="application/json">
+      {{ manifest | tojson | safe }}
+    </script>
+  </main>
+
+  <footer class="footer">
+    <span>© 2025 — Spotify Analytics Dashboard</span>
+  </footer>
+</body>
+</html>
