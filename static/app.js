@@ -96,6 +96,12 @@ function renderInsightfulCharts(chartsData) {
                 case 'multi_line':
                     renderMultiLineChart(chartKey, chartData);
                     break;
+                case 'single_line':
+                    renderSingleLineChart(chartKey, chartData);
+                    break;
+                case 'seasonal_bar':
+                    renderSeasonalBarChart(chartKey, chartData);
+                    break;
                 case 'network':
                     renderNetworkChart(chartKey, chartData);
                     break;
@@ -351,43 +357,200 @@ function renderMultiLineChart(chartKey, data) {
     });
 }
 
+function renderSingleLineChart(chartKey, data) {
+    const canvas = createChartCanvas(chartKey, data.title, data.insight);
+    const ctx = canvas.getContext('2d');
+    
+    // Sort the monthly data by date
+    const sortedMonths = Object.keys(data.monthly).sort();
+    const sortedValues = sortedMonths.map(month => data.monthly[month]);
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sortedMonths,
+            datasets: [{
+                label: 'Monthly Releases',
+                data: sortedValues,
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 4,
+                pointHoverRadius: 6,
+                pointBackgroundColor: '#3498db',
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            resizeDelay: 0,
+            plugins: {
+                title: {
+                    display: true,
+                    text: data.title,
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: true,
+                    position: 'top'
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            return `${context.label}: ${context.parsed.y.toLocaleString()} releases`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Number of Releases'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Month'
+                    },
+                    ticks: {
+                        maxRotation: 45,
+                        minRotation: 45,
+                        maxTicksLimit: 12, // Limit number of ticks for readability
+                        callback: function(value, index, ticks) {
+                            // Show every 2nd month for better readability
+                            return index % 2 === 0 ? this.getLabelForValue(value) : '';
+                        }
+                    }
+                }
+            }
+        }
+    });
+}
+
+function renderSeasonalBarChart(chartKey, data) {
+    const canvas = createChartCanvas(chartKey, data.title, data.insight);
+    const ctx = canvas.getContext('2d');
+    
+    // Sort months in calendar order
+    const monthOrder = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 
+                       'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    const sortedData = monthOrder.map(month => ({
+        month: month,
+        count: data.monthly_averages[month] || 0
+    }));
+    
+    // Find peak and low months for color coding
+    const maxCount = Math.max(...sortedData.map(d => d.count));
+    const minCount = Math.min(...sortedData.map(d => d.count));
+    
+    new Chart(ctx, {
+        type: 'line',
+        data: {
+            labels: sortedData.map(d => d.month),
+            datasets: [{
+                label: 'Average Monthly Releases',
+                data: sortedData.map(d => d.count),
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52, 152, 219, 0.1)',
+                borderWidth: 3,
+                fill: true,
+                tension: 0.4,
+                pointRadius: 6,
+                pointHoverRadius: 8,
+                pointBackgroundColor: sortedData.map(d => {
+                    // Color code points: green for high, red for low, blue for average
+                    if (d.count === maxCount) return '#2ecc71'; // Green for peak
+                    if (d.count === minCount) return '#e74c3c'; // Red for low
+                    return '#3498db'; // Blue for average
+                }),
+                pointBorderColor: '#fff',
+                pointBorderWidth: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            maintainAspectRatio: false,
+            resizeDelay: 0,
+            plugins: {
+                title: {
+                    display: true,
+                    text: data.title,
+                    font: { size: 16, weight: 'bold' }
+                },
+                legend: {
+                    display: false
+                },
+                tooltip: {
+                    callbacks: {
+                        label: function(context) {
+                            const count = context.parsed.y;
+                            const month = context.label;
+                            let status = '';
+                            if (count === maxCount) status = ' (Peak Month)';
+                            else if (count === minCount) status = ' (Low Month)';
+                            return `${month}: ${count.toLocaleString()} releases${status}`;
+                        }
+                    }
+                }
+            },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    title: {
+                        display: true,
+                        text: 'Average Releases per Month'
+                    },
+                    ticks: {
+                        callback: function(value) {
+                            return value.toLocaleString();
+                        }
+                    }
+                },
+                x: {
+                    title: {
+                        display: true,
+                        text: 'Month'
+                    }
+                }
+            }
+        }
+    });
+}
+
 function renderBoxPlotChart(chartKey, data) {
     const canvas = createChartCanvas(chartKey, data.title, data.insight);
     const ctx = canvas.getContext('2d');
     
-    // Create proper box plot data with statistical values
-    const datasets = [{
-        label: 'Popularity Distribution',
-        data: data.genres.map(genre => {
-            const stats = data.data[genre];
-            return {
-                min: stats.min,
-                q1: stats.q1,
-                median: stats.median,
-                q3: stats.q3,
-                max: stats.max,
-                mean: stats.mean
-            };
-        }),
-        backgroundColor: data.genres.map((_, index) => getChartColor(index, 0.3)),
-        borderColor: data.genres.map((_, index) => getChartColor(index)),
-        borderWidth: 2
-    }];
+    // Handle both genres and features data
+    const labels = data.genres || data.features || [];
+    const labelKey = data.genres ? 'genres' : 'features';
     
     // Use bar chart to show mean values with error bars
     new Chart(ctx, {
         type: 'bar',
         data: {
-            labels: data.genres,
+            labels: labels,
             datasets: [{
-                label: 'Average Popularity',
-                data: data.genres.map(genre => data.data[genre].mean),
-                backgroundColor: data.genres.map((_, index) => getChartColor(index, 0.6)),
-                borderColor: data.genres.map((_, index) => getChartColor(index)),
+                label: data.genres ? 'Average Popularity' : 'Average Feature Value',
+                data: labels.map(item => data.data[item].mean),
+                backgroundColor: labels.map((_, index) => getChartColor(index, 0.6)),
+                borderColor: labels.map((_, index) => getChartColor(index)),
                 borderWidth: 2,
-                errorBars: data.genres.map(genre => ({
-                    plus: data.data[genre].std,
-                    minus: data.data[genre].std
+                errorBars: labels.map(item => ({
+                    plus: data.data[item].std,
+                    minus: data.data[item].std
                 }))
             }]
         },
@@ -407,11 +570,10 @@ function renderBoxPlotChart(chartKey, data) {
                 tooltip: {
                     callbacks: {
                         label: function(context) {
-                            const genre = context.label;
-                            const stats = data.data[genre];
+                            const item = context.label;
+                            const stats = data.data[item];
                             return [
                                 `Mean: ${stats.mean}`,
-                                `Median: ${stats.median}`,
                                 `Min: ${stats.min}, Max: ${stats.max}`,
                                 `Std Dev: ${stats.std}`
                             ];
@@ -424,13 +586,13 @@ function renderBoxPlotChart(chartKey, data) {
                     beginAtZero: true,
                     title: {
                         display: true,
-                        text: 'Popularity Score'
+                        text: data.genres ? 'Popularity Score' : 'Feature Value'
                     }
                 },
                 x: {
                     title: {
                         display: true,
-                        text: 'Music Genres'
+                        text: data.genres ? 'Music Genres' : 'Audio Features'
                     }
                 }
             }
