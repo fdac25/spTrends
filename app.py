@@ -159,8 +159,29 @@ class TTLCache:
 # Global cache instance
 cache = TTLCache(ttl_seconds=300)  # 5 minute cache
 
-def generate_insightful_charts(filtered_df):
-    """Generate meaningful business intelligence charts with real insights from EDA data"""
+def add_release_date_column(df):
+    """Create a release_date column from existing date fields."""
+    if df is None or df.empty:
+        return df
+
+    working_df = df.copy()
+    release_source = None
+
+    if 'album_release_date' in working_df.columns:
+        release_source = working_df['album_release_date']
+    elif 'snapshot_date' in working_df.columns:
+        release_source = working_df['snapshot_date']
+
+    if release_source is not None:
+        working_df['release_date'] = pd.to_datetime(release_source, errors='coerce')
+        working_df['release_date'] = working_df['release_date'].fillna(method='ffill')
+    else:
+        working_df['release_date'] = pd.NaT
+
+    return working_df
+
+def generate_charts_from_eda():
+    """Generate meaningful business intelligence charts from cached EDA summaries."""
     charts_data = {}
     
     # Use real EDA data directly instead of relying on filtered_df
@@ -266,32 +287,6 @@ def generate_insightful_charts(filtered_df):
             'insight': f'Shows artists with the most unique songs (not duplicate entries)'
         }
     
-    # 6. Genre Distribution Analysis - Create from processed data
-    if processed_df is not None and 'name' in processed_df.columns:
-        # Sample data for genre analysis (since genre column might not exist)
-        # Create realistic genre distribution based on artist patterns
-        genre_distribution = {
-            'Pop': 25.5,
-            'Hip-Hop': 20.3,
-            'Rock': 15.2,
-            'EDM': 12.1,
-            'Latin': 8.7,
-            'R&B': 7.4,
-            'Country': 4.2,
-            'Jazz': 2.8,
-            'Classical': 2.1,
-            'Folk': 1.7
-        }
-        
-        charts_data['genre_distribution'] = {
-            'type': 'pie_with_insights',
-            'data': {genre: {'count': int(count * 1000), 'percentage': count, 'category': 'major' if count > 10 else 'minor'} 
-                    for genre, count in genre_distribution.items()},
-            'total_songs': 1000,
-            'title': 'Music Genre Distribution',
-            'insight': 'Estimated genre distribution based on artist patterns'
-        }
-    
     # 7. Audio Feature Distribution Analysis
     if processed_df is not None and 'danceability' in processed_df.columns:
         # Sample audio features for distribution analysis
@@ -342,51 +337,197 @@ def generate_insightful_charts(filtered_df):
     
     return charts_data
 
-def apply_filters_to_dataset(dataset, countries=None, genres=None, subgenres=None, languages=None, 
-                           pop_min=None, pop_max=None, release_start=None, release_end=None, trend=None):
+
+def build_charts_from_filtered_data(filtered_df, filters=None):
+    """Build chart payloads that respond directly to the active filters."""
+    charts_data = {}
+    if filtered_df is None or filtered_df.empty:
+        return charts_data
+    
+    df = filtered_df.replace([np.inf, -np.inf], np.nan)
+    
+    # 1. Country activity driven by filtered dataset
+    if 'country' in df.columns:
+        # Count unique songs per country (not total entries) to avoid duplicates
+        if 'spotify_id' in df.columns:
+            country_counts = df.groupby('country')['spotify_id'].nunique().sort_values(ascending=False).head(10)
+        else:
+            # Fallback to row count if spotify_id not available
+            country_counts = df['country'].value_counts().head(10)
+        
+        if not country_counts.empty:
+            charts_data['country_activity'] = {
+                'type': 'bar',
+                'countries': [get_country_name(code) for code in country_counts.index],
+                'song_counts': country_counts.astype(int).tolist(),
+                'title': 'Top Countries (Filtered View)',
+                'insight': f"{country_counts.sum():,} tracks across {len(country_counts)} highlighted markets"
+            }
+    
+    # 2. Temporal trends using release dates
+    if 'release_date' in df.columns:
+        release_df = df.dropna(subset=['release_date']).copy()
+        if not release_df.empty:
+            release_df['release_date'] = pd.to_datetime(release_df['release_date'], errors='coerce')
+            release_df = release_df.dropna(subset=['release_date'])
+            if not release_df.empty:
+                release_df['month_label'] = release_df['release_date'].dt.to_period('M').astype(str)
+                monthly_counts = release_df.groupby('month_label').size().sort_index()
+                recent_months = monthly_counts.tail(24)
+                if not recent_months.empty:
+                    charts_data['temporal_analysis'] = {
+                        'type': 'single_line',
+                        'monthly': recent_months.to_dict(),
+                        'title': 'Release Volume Over Time',
+                        'insight': f"Shows last {len(recent_months)} months after applying filters"
+                    }
+    
+    # 4. Audio feature stats for filtered sample
+    audio_features = ['danceability', 'energy', 'valence', 'acousticness', 'speechiness', 'instrumentalness', 'liveness']
+    available_audio_features = [feature for feature in audio_features if feature in df.columns]
+    feature_stats = {}
+    for feature in available_audio_features:
+        series = df[feature].dropna()
+        if series.empty:
+            continue
+        std_value = round(series.std(), 3) if len(series) > 1 else 0.0
+        feature_stats[feature] = {
+            'mean': round(series.mean(), 3),
+            'std': std_value if not np.isnan(std_value) else 0.0,
+            'min': round(series.min(), 3),
+            'max': round(series.max(), 3)
+        }
+    if feature_stats:
+        charts_data['audio_feature_distribution'] = {
+            'type': 'box_plot',
+            'features': list(feature_stats.keys()),
+            'data': feature_stats,
+            'title': 'Audio Features (Filtered Sample)',
+            'insight': f"{len(feature_stats)} feature distributions recalculated with active filters"
+        }
+    
+    # 5. Explicit vs clean comparison
+    if {'is_explicit', 'popularity'}.issubset(df.columns):
+        explicit_df = df[['is_explicit', 'popularity']].dropna()
+        if not explicit_df.empty:
+            explicit_df['is_explicit'] = explicit_df['is_explicit'].astype(bool)
+            stats = explicit_df.groupby('is_explicit')['popularity'].agg(['mean', 'median', 'count'])
+            total = stats['count'].sum()
+            explicit_count = int(stats.loc[True, 'count']) if True in stats.index else 0
+            clean_count = int(stats.loc[False, 'count']) if False in stats.index else 0
+            charts_data['explicitness_impact'] = {
+                'type': 'comparison',
+                'explicit': {
+                    'mean': round(stats.loc[True, 'mean'], 1) if True in stats.index else 0,
+                    'median': round(stats.loc[True, 'median'], 1) if True in stats.index else 0,
+                    'count': explicit_count,
+                    'percentage': round((explicit_count / total) * 100, 1) if total else 0
+                },
+                'clean': {
+                    'mean': round(stats.loc[False, 'mean'], 1) if False in stats.index else 0,
+                    'median': round(stats.loc[False, 'median'], 1) if False in stats.index else 0,
+                    'count': clean_count,
+                    'percentage': round((clean_count / total) * 100, 1) if total else 0
+                },
+                'title': 'Explicitness vs Popularity (Filtered)',
+                'insight': f"{explicit_count:,} explicit tracks vs {clean_count:,} clean tracks in current view"
+            }
+    
+    # 5. Correlation network recalculated from filtered data
+    corr_features = [f for f in audio_features if f in df.columns]
+    if len(corr_features) >= 3:
+        corr_matrix = df[corr_features].corr().stack().reset_index()
+        corr_matrix.columns = ['feature1', 'feature2', 'correlation']
+        corr_matrix = corr_matrix[corr_matrix['feature1'] != corr_matrix['feature2']]
+        corr_matrix['abs_corr'] = corr_matrix['correlation'].abs()
+        corr_matrix = corr_matrix[corr_matrix['abs_corr'] >= 0.3].sort_values('abs_corr', ascending=False)
+        
+        correlations = []
+        seen_pairs = set()
+        for _, row in corr_matrix.iterrows():
+            pair = tuple(sorted([row['feature1'], row['feature2']]))
+            if pair in seen_pairs:
+                continue
+            seen_pairs.add(pair)
+            correlations.append({
+                'feature1': row['feature1'],
+                'feature2': row['feature2'],
+                'correlation': round(row['correlation'], 3),
+                'strength': 'strong' if row['abs_corr'] >= 0.6 else 'moderate'
+            })
+            if len(correlations) >= 15:
+                break
+        
+        if correlations:
+            charts_data['audio_correlations'] = {
+                'type': 'network',
+                'features': corr_features,
+                'correlations': correlations,
+                'title': 'Audio Feature Network (Filtered)',
+                'insight': f"{len(correlations)} strongest relationships recalculated from current data slice"
+            }
+    
+    return charts_data
+
+
+def generate_insightful_charts(filtered_df, filters=None):
+    """Return charts that respect filters, falling back to cached EDA summaries when necessary."""
+    if filtered_df is None or filtered_df.empty:
+        logger.warning("Filtered dataset empty; falling back to EDA charts")
+        return generate_charts_from_eda()
+    
+    try:
+        charts = build_charts_from_filtered_data(filtered_df, filters=filters)
+        if charts and len(charts) > 0:
+            return charts
+        logger.warning("No charts built from filtered data; using EDA fallback")
+    except Exception as exc:
+        logger.error(f"Error building filtered charts: {exc}", exc_info=True)
+    
+    return generate_charts_from_eda()
+
+def apply_filters_to_dataset(dataset, countries=None, pop_min=None, pop_max=None,
+                             release_start=None, release_end=None, trend=None):
     """Apply filters to dataset and return filtered DataFrame"""
     if dataset is None or dataset.empty:
         return dataset
     
     filtered_df = dataset.copy()
+    if 'release_date' in filtered_df.columns:
+        filtered_df['release_date'] = pd.to_datetime(filtered_df['release_date'], errors='coerce')
     
     # Apply filters
-    if countries:
+    if countries and 'country' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['country'].isin(countries)]
     
-    if genres:
-        filtered_df = filtered_df[filtered_df['genre'].isin(genres)]
-    
-    if subgenres:
-        filtered_df = filtered_df[filtered_df['subgenre'].isin(subgenres)]
-    
-    if languages:
-        filtered_df = filtered_df[filtered_df['language'].isin(languages)]
-    
-    if pop_min is not None:
+    if pop_min is not None and 'popularity' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['popularity'] >= pop_min]
     
-    if pop_max is not None:
+    if pop_max is not None and 'popularity' in filtered_df.columns:
         filtered_df = filtered_df[filtered_df['popularity'] <= pop_max]
     
-    if release_start:
-        filtered_df = filtered_df[filtered_df['release_date'] >= release_start]
+    if release_start and 'release_date' in filtered_df.columns:
+        start_dt = pd.to_datetime(release_start, errors='coerce')
+        if pd.notna(start_dt):
+            filtered_df = filtered_df[filtered_df['release_date'] >= start_dt]
     
-    if release_end:
-        filtered_df = filtered_df[filtered_df['release_date'] <= release_end]
+    if release_end and 'release_date' in filtered_df.columns:
+        end_dt = pd.to_datetime(release_end, errors='coerce')
+        if pd.notna(end_dt):
+            filtered_df = filtered_df[filtered_df['release_date'] <= end_dt]
     
     # Apply trend filter
-    if trend == 'growing':
+    if trend == 'growing' and {'popularity', 'release_date'}.issubset(filtered_df.columns):
         filtered_df = filtered_df[
             (filtered_df['popularity'] > 70) & 
             (filtered_df['release_date'] >= '2023-01-01')
         ]
-    elif trend == 'declining':
+    elif trend == 'declining' and {'popularity', 'release_date'}.issubset(filtered_df.columns):
         filtered_df = filtered_df[
             (filtered_df['popularity'] < 30) | 
             (filtered_df['release_date'] < '2022-01-01')
         ]
-    elif trend == 'steady':
+    elif trend == 'steady' and 'popularity' in filtered_df.columns:
         filtered_df = filtered_df[
             (filtered_df['popularity'] >= 30) & 
             (filtered_df['popularity'] <= 70)
@@ -404,27 +545,6 @@ def validate_filter_params(params):
         if isinstance(countries, str):
             countries = [countries]
         validated['countries'] = [c.upper() for c in countries if len(c) == 2 and c.isalpha()]
-    
-    # Validate genres (should be non-empty strings)
-    if params.get('genres'):
-        genres = params['genres']
-        if isinstance(genres, str):
-            genres = [genres]
-        validated['genres'] = [g.strip() for g in genres if g and g.strip()]
-    
-    # Validate subgenres
-    if params.get('subgenres'):
-        subgenres = params['subgenres']
-        if isinstance(subgenres, str):
-            subgenres = [subgenres]
-        validated['subgenres'] = [sg.strip() for sg in subgenres if sg and sg.strip()]
-    
-    # Validate languages
-    if params.get('languages'):
-        languages = params['languages']
-        if isinstance(languages, str):
-            languages = [languages]
-        validated['languages'] = [l.strip() for l in languages if l and l.strip()]
     
     # Validate popularity range
     pop_min = params.get('pop_min')
@@ -489,9 +609,6 @@ def extract_filter_params(request):
     """Extract and validate filter parameters from request"""
     raw_params = {
         'countries': request.args.getlist('country'),
-        'genres': request.args.getlist('genre'),
-        'subgenres': request.args.getlist('subgenre'),
-        'languages': request.args.getlist('language'),
         'pop_min': request.args.get('popMin', type=int),
         'pop_max': request.args.get('popMax', type=int),
         'release_start': request.args.get('releaseStart'),
@@ -516,7 +633,7 @@ def get_filtered_dataset(filters=None):
             # Sample the data for performance (take every 200th record to get ~10k records)
             sample_df = processed_df.iloc[::200].copy()
             logger.info(f"Sampled dataset to {len(sample_df)} records for performance")
-            return sample_df
+            return add_release_date_column(sample_df)
         
         # If no processed dataset, try to load the original dataset
         try:
@@ -528,83 +645,12 @@ def get_filtered_dataset(filters=None):
                 # Sample for performance
                 sample_df = df.iloc[::200].copy()
                 logger.info(f"Loaded and sampled original dataset to {len(sample_df)} records")
-                return sample_df
+                return add_release_date_column(sample_df)
         except Exception as e:
             logger.warning(f"Could not load original dataset: {str(e)}")
         
-        # Fallback: Create realistic data based on actual EDA insights
-        logger.warning("Using fallback synthetic data based on EDA insights")
-        
-        # Get real insights from EDA data
-        basic_summary = EDA_DATA['summaries'].get('basic_data', {})
-        total_records = basic_summary.get('total_records', 2110316)
-        
-        # Get actual country distribution from EDA
-        geo_summary = EDA_DATA['summaries'].get('geographical_analysis', {})
-        if geo_summary and 'top_10_countries' in geo_summary:
-            country_data = geo_summary['top_10_countries']
-            countries = list(country_data.keys())
-            country_weights = [country_data[country] for country in countries]
-            # Normalize weights
-            country_weights = [w/sum(country_weights) for w in country_weights]
-        else:
-            countries = ['US', 'GB', 'BR', 'DE', 'JP', 'FR', 'CA', 'AU', 'IT', 'ES']
-            country_weights = [0.3, 0.15, 0.1, 0.08, 0.07, 0.06, 0.05, 0.04, 0.03, 0.02]
-        
-        # Get actual genre distribution from EDA
-        genre_summary = EDA_DATA['summaries'].get('genre_artist_analysis', {})
-        if genre_summary and 'top_10_genres' in genre_summary:
-            genre_data = genre_summary['top_10_genres']
-            genres = list(genre_data.keys())
-            genre_weights = [genre_data[genre] for genre in genres]
-            # Normalize weights
-            genre_weights = [w/sum(genre_weights) for w in genre_weights]
-        else:
-            genres = ['Pop', 'Hip-Hop', 'Rock', 'EDM', 'Latin', 'R&B', 'Country', 'Jazz', 'Classical', 'Folk']
-            genre_weights = [0.25, 0.2, 0.15, 0.1, 0.08, 0.07, 0.05, 0.03, 0.03, 0.02]
-        
-        # Get actual audio feature correlations from EDA
-        audio_summary = EDA_DATA['summaries'].get('audio_features_analysis', {})
-        correlations = audio_summary.get('strongest_correlations', [])
-        
-        # Generate realistic data based on actual distributions
-        np.random.seed(42)  # For reproducible results
-        sample_size = min(10000, total_records)
-        
-        # Generate data with realistic distributions
-        data = {
-            'country': np.random.choice(countries, sample_size, p=country_weights),
-            'genre': np.random.choice(genres, sample_size, p=genre_weights),
-            'popularity': np.random.normal(50, 20, sample_size).clip(0, 100),  # Normal distribution around 50
-            'is_explicit': np.random.choice([True, False], sample_size, p=[0.3, 0.7]),
-            'danceability': np.random.beta(2, 2, sample_size),  # Beta distribution for 0-1 values
-            'energy': np.random.beta(2, 2, sample_size),
-            'valence': np.random.beta(2, 2, sample_size),
-            'acousticness': np.random.beta(1, 3, sample_size),  # Skewed toward lower values
-            'speechiness': np.random.beta(1, 4, sample_size),  # Most songs have low speechiness
-            'instrumentalness': np.random.beta(1, 5, sample_size),  # Most songs have vocals
-            'liveness': np.random.beta(1, 3, sample_size),
-            'tempo': np.random.normal(120, 30, sample_size).clip(60, 200),
-            'duration_ms': np.random.normal(200000, 50000, sample_size).clip(60000, 300000),
-            'release_date': pd.date_range('2020-01-01', '2024-12-31', periods=sample_size),
-            'artist_name': [f"Artist_{i}" for i in np.random.randint(1, 10000, sample_size)]
-        }
-        
-        # Apply correlations between audio features
-        for corr in correlations:
-            if corr['strength'] == 'strong' and abs(corr['correlation']) > 0.5:
-                feature1 = corr['feature1']
-                feature2 = corr['feature2']
-                if feature1 in data and feature2 in data:
-                    # Apply correlation
-                    corr_value = corr['correlation']
-                    data[feature2] = data[feature1] * corr_value + np.random.normal(0, 0.1, sample_size)
-                    data[feature2] = data[feature2].clip(0, 1)
-        
-        # Convert to DataFrame
-        df = pd.DataFrame(data)
-        logger.info(f"Created realistic synthetic dataset with {len(df)} records based on EDA insights")
-        return df
+        logger.error("Processed Spotify dataset not available")
+        return None
     except Exception as e:
         logger.error(f"Could not create filtered dataset: {str(e)}")
         return None
@@ -689,35 +735,34 @@ def get_filter_options():
             return jsonify(format_api_response(None, status='error', message="Dataset not loaded")), 500
         
         # Create country options with both codes and names
-        country_codes = sorted(dataset['country'].unique().tolist())
+        country_codes = sorted(dataset['country'].dropna().unique().tolist()) if 'country' in dataset.columns else []
         country_options = [{"code": code, "name": get_country_name(code)} for code in country_codes]
         
         # Build filter options based on available columns
         filter_options = {
             "countries": country_options,
-            "genres": sorted(dataset['genre'].unique().tolist()),
-            "popularity_range": {
+        }
+        if 'popularity' in dataset.columns and not dataset['popularity'].dropna().empty:
+            filter_options["popularity_range"] = {
                 "min": int(dataset['popularity'].min()),
                 "max": int(dataset['popularity'].max())
-            },
-            "date_range": {
+            }
+        else:
+            filter_options["popularity_range"] = {"min": 0, "max": 100}
+        
+        if 'release_date' in dataset.columns and not dataset['release_date'].dropna().empty:
+            filter_options["date_range"] = {
                 "start": dataset['release_date'].min().strftime('%Y-%m-%d'),
                 "end": dataset['release_date'].max().strftime('%Y-%m-%d')
             }
-        }
-        
-        # Only add columns that exist in the dataset
-        if 'subgenre' in dataset.columns:
-            filter_options["subgenres"] = sorted(dataset['subgenre'].unique().tolist())
-        if 'language' in dataset.columns:
-            filter_options["languages"] = sorted(dataset['language'].unique().tolist())
+        else:
+            filter_options["date_range"] = {"start": "2020-01-01", "end": "2024-12-31"}
         
         # Cache the result
         cache.set(cache_key, filter_options)
         
         metadata = {
             "total_countries": len(country_options),
-            "total_genres": len(filter_options["genres"]),
             "dataset_size": len(dataset)
         }
         
@@ -783,7 +828,8 @@ def get_chart_data():
         logger.debug(f"Applied chart filters, resulting in {len(filtered_df)} records")
         
         # Generate insightful charts instead of basic ones
-        charts_data = generate_insightful_charts(filtered_df)
+        # Pass filters so we can use full dataset for accurate country counts
+        charts_data = generate_insightful_charts(filtered_df, filters=filters)
         
         # Add metadata about the analysis
         metadata = {
@@ -877,8 +923,12 @@ def get_eda_charts():
             # Load the full processed dataset to get all 72 countries
             processed_df = EDA_DATA['tables'].get('processed_spotify_dataset')
             if processed_df is not None and 'country' in processed_df.columns:
-                # Get country counts from the full dataset
-                country_counts = processed_df['country'].dropna().value_counts()
+                # Get country counts from the full dataset - count unique songs per country
+                if 'spotify_id' in processed_df.columns:
+                    country_counts = processed_df.groupby('country')['spotify_id'].nunique().sort_values(ascending=False)
+                else:
+                    # Fallback to row count if spotify_id not available
+                    country_counts = processed_df['country'].dropna().value_counts()
                 # Get top 20 countries for better visualization
                 top_countries_data = country_counts.head(20)
                 countries = top_countries_data.index.tolist()
@@ -945,19 +995,6 @@ def get_eda_charts():
             charts_data['audio_features'] = {
                 'features': features,
                 'correlation_matrix': correlation_data
-            }
-        
-        # Genre distribution from EDA
-        genre_summary = EDA_DATA['summaries'].get('genre_artist_analysis', {})
-        top_genres = genre_summary.get('top_10_genres', {})
-        if top_genres and len(top_genres) > 0:
-            genres = list(top_genres.keys())
-            counts = list(top_genres.values())
-            
-            charts_data['genre_distribution'] = {
-                'labels': genres,
-                'data': counts,
-                'counts': counts
             }
         
         # Explicitness analysis from EDA
@@ -1035,11 +1072,11 @@ def get_eda_charts():
         model_predictions_df = EDA_DATA['tables'].get('model_predictions')
         if model_predictions_df is not None and len(model_predictions_df) > 0:
             # Sample predictions for visualization (first 1000 predictions)
-            sample_predictions = model_predictions_df.head(1000)
+            # Use full dataset for model predictions
             charts_data['model_predictions'] = {
-                'actual': sample_predictions.iloc[:, 0].tolist() if len(sample_predictions.columns) > 0 else [],
-                'predicted': sample_predictions.iloc[:, 1].tolist() if len(sample_predictions.columns) > 1 else [],
-                'residuals': sample_predictions.iloc[:, 2].tolist() if len(sample_predictions.columns) > 2 else []
+                'actual': model_predictions_df.iloc[:, 0].tolist() if len(model_predictions_df.columns) > 0 else [],
+                'predicted': model_predictions_df.iloc[:, 1].tolist() if len(model_predictions_df.columns) > 1 else [],
+                'residuals': model_predictions_df.iloc[:, 2].tolist() if len(model_predictions_df.columns) > 2 else []
             }
         
         # Weekly/Monthly/Yearly Trends
@@ -1366,14 +1403,13 @@ def get_comprehensive_dashboard():
             
             # Feature Correlation Scatter Plot (Energy vs Loudness)
             if processed_df is not None:
-                # Sample data for scatter plot
-                sample_data = processed_df.sample(1000)
+                # Use full dataset for scatter plot
                 audio_section["subplots"].append({
                     "id": "energy_loudness_scatter",
                     "type": "scatter",
                     "title": "Energy vs Loudness Correlation",
-                    "labels": sample_data['energy'].tolist(),
-                    "data": sample_data['loudness'].tolist(),
+                    "labels": processed_df['energy'].tolist(),
+                    "data": processed_df['loudness'].tolist(),
                     "xlabel": "Energy",
                     "ylabel": "Loudness"
                 })

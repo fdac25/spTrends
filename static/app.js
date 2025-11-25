@@ -60,6 +60,17 @@ const style = document.createElement('style');
 style.textContent = spinnerCSS;
 document.head.appendChild(style);
 
+// Track default filter bounds so we only send real user overrides
+const defaultFilters = {
+  popMin: null,
+  popMax: null,
+  releaseStart: null,
+  releaseEnd: null
+};
+
+// Lookup map for friendlier country names in the scope banner
+const countryLookup = new Map();
+
 // Debouncing utility to reduce redundant API calls
 function debounce(func, wait) {
   let timeout;
@@ -1141,37 +1152,194 @@ function getCurrentFilters() {
   }
   
   // Get other filters
-  const genre = document.getElementById('genre')?.value;
-  const subgenre = document.getElementById('subgenre')?.value;
-  const language = document.getElementById('language')?.value;
   const popMin = document.getElementById('popMin')?.value;
   const popMax = document.getElementById('popMax')?.value;
   const releaseStart = document.getElementById('releaseStart')?.value;
   const releaseEnd = document.getElementById('releaseEnd')?.value;
   const trend = document.getElementById('trend')?.value;
   
-  if (genre) filters.append('genre', genre);
-  if (subgenre) filters.append('subgenre', subgenre);
-  if (language) filters.append('language', language);
-  if (popMin) filters.append('popMin', popMin);
-  if (popMax) filters.append('popMax', popMax);
-  if (releaseStart) filters.append('releaseStart', releaseStart);
-  if (releaseEnd) filters.append('releaseEnd', releaseEnd);
+  const hasPopMin = popMin !== '' && popMin !== null && popMin !== undefined;
+  if (hasPopMin && (defaultFilters.popMin === null || popMin !== defaultFilters.popMin)) {
+    filters.append('popMin', popMin);
+  }
+  
+  const hasPopMax = popMax !== '' && popMax !== null && popMax !== undefined;
+  if (hasPopMax && (defaultFilters.popMax === null || popMax !== defaultFilters.popMax)) {
+    filters.append('popMax', popMax);
+  }
+  
+  if (releaseStart && (defaultFilters.releaseStart === null || releaseStart !== defaultFilters.releaseStart)) {
+    filters.append('releaseStart', releaseStart);
+  }
+  
+  if (releaseEnd && (defaultFilters.releaseEnd === null || releaseEnd !== defaultFilters.releaseEnd)) {
+    filters.append('releaseEnd', releaseEnd);
+  }
+  
   if (trend) filters.append('trend', trend);
   
   return filters;
 }
 
+function formatNumber(value, fractionDigits = 0) {
+  const num = Number(value);
+  if (Number.isNaN(num)) {
+    return fractionDigits > 0
+      ? Number(0).toLocaleString(undefined, { minimumFractionDigits: fractionDigits, maximumFractionDigits: fractionDigits })
+      : '0';
+  }
+
+  return num.toLocaleString(undefined, {
+    minimumFractionDigits: fractionDigits,
+    maximumFractionDigits: fractionDigits
+  });
+}
+
+function updateKpis(kpiData = {}) {
+  const kpiValues = {
+    total_tracks: formatNumber(kpiData.total_tracks || 0),
+    avg_energy: formatNumber(kpiData.avg_energy || 0, 3),
+    avg_danceability: formatNumber(kpiData.avg_danceability || 0, 3),
+    countries_covered: formatNumber(kpiData.countries_covered || 0),
+    last_ingest: kpiData.last_ingest || '—'
+  };
+
+  Object.entries(kpiValues).forEach(([key, value]) => {
+    const element = document.querySelector(`[data-kpi="${key}"]`);
+    if (element) {
+      element.textContent = value;
+    }
+  });
+}
+
+function getCountryDisplayName(code) {
+  if (!code) {
+    return '';
+  }
+  return countryLookup.get(code) || code;
+}
+
+function summarizeCountries(codes = []) {
+  const input = Array.isArray(codes) ? codes : [codes];
+  const uniqueCodes = Array.from(new Set(input.filter(Boolean)));
+  if (!uniqueCodes.length) {
+    return '';
+  }
+  const names = uniqueCodes.map(getCountryDisplayName);
+  if (names.length <= 2) {
+    return names.join(', ');
+  }
+  return `${names.slice(0, 2).join(', ')} +${names.length - 2} more`;
+}
+
+function formatMonthLabel(value) {
+  if (!value) {
+    return null;
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return value;
+  }
+  return date.toLocaleDateString(undefined, { year: 'numeric', month: 'short' });
+}
+
+function formatDateRange(start, end) {
+  const startLabel = formatMonthLabel(start);
+  const endLabel = formatMonthLabel(end);
+  if (startLabel && endLabel) {
+    return `${startLabel} – ${endLabel}`;
+  }
+  return startLabel || endLabel || '';
+}
+
+function titleCase(value = '') {
+  if (!value) {
+    return '';
+  }
+  return value.charAt(0).toUpperCase() + value.slice(1);
+}
+
+function buildScopeSummary(filters = {}) {
+  if (!filters || Object.keys(filters).length === 0) {
+    return 'Global dataset (all markets)';
+  }
+  
+  const segments = [];
+  const countriesText = summarizeCountries(filters.countries);
+  if (countriesText) {
+    segments.push(`Markets: ${countriesText}`);
+  }
+  
+  const popMinValue = typeof filters.pop_min === 'number' ? filters.pop_min : Number(filters.pop_min);
+  const popMaxValue = typeof filters.pop_max === 'number' ? filters.pop_max : Number(filters.pop_max);
+  const hasPopMin = Number.isFinite(popMinValue);
+  const hasPopMax = Number.isFinite(popMaxValue);
+  if (hasPopMin || hasPopMax) {
+    const minLabel = hasPopMin ? popMinValue : Number(defaultFilters.popMin ?? 0);
+    const maxLabel = hasPopMax ? popMaxValue : Number(defaultFilters.popMax ?? 100);
+    segments.push(`Popularity ${minLabel}–${maxLabel}`);
+  }
+  
+  const releaseWindow = formatDateRange(filters.release_start, filters.release_end);
+  if (releaseWindow) {
+    segments.push(`Release window ${releaseWindow}`);
+  }
+  
+  if (filters.trend) {
+    segments.push(`${titleCase(filters.trend)} trend focus`);
+  }
+  
+  if (!segments.length) {
+    return 'Global dataset (all markets)';
+  }
+  return segments.join(' · ');
+}
+
+function renderScopeSummary({ chartCount, scopeSummary, datasetSize }) {
+  const filterStatus = document.getElementById('filter-status');
+  if (!filterStatus) {
+    return;
+  }
+  
+  const datasetText = typeof datasetSize === 'number'
+    ? `${formatNumber(datasetSize)} tracks in view`
+    : null;
+  const detailParts = [scopeSummary, datasetText].filter(Boolean).join(' · ');
+  const detailContent = detailParts || 'Global dataset (all markets)';
+  
+  filterStatus.innerHTML = `
+    <div style="display:flex; flex-direction:column; gap:6px;">
+      <div style="display:flex; align-items:center; gap:10px; color:#27ae60;">
+        <span style="font-size:18px;">✅</span>
+        <span>${chartCount} insightful analytics charts refreshed</span>
+      </div>
+      <div style="padding-left:28px; font-size:13px; color:var(--text); opacity:0.85;">
+        ${detailContent}
+      </div>
+    </div>
+  `;
+  filterStatus.style.color = 'var(--text)';
+}
+
+function clearMultiSelect(selectEl) {
+  if (!selectEl) {
+    return;
+  }
+  Array.from(selectEl.options || []).forEach(option => {
+    option.selected = false;
+  });
+  selectEl.selectedIndex = -1;
+}
+
 async function loadFilterOptions() {
   try {
     console.log('🔄 Loading filter options...');
-    showLoadingState('Loading filter options...');
     
     const response = await fetchWithCache('/api/filter-options');
     const result = await response.json();
     
     if (result.status === 'error') {
-      showErrorState(result.message || 'Error loading filter options');
+      console.error('Error loading filter options:', result.message);
       return;
     }
     
@@ -1182,73 +1350,122 @@ async function loadFilterOptions() {
     const countrySelect = document.getElementById('country');
     if (countrySelect && options.countries) {
       countrySelect.innerHTML = '<option value="">All Countries</option>';
+      countryLookup.clear();
       options.countries.forEach(country => {
+        const label = country.name || country.code;
         const option = document.createElement('option');
         option.value = country.code;
-        option.textContent = country.name;
+        option.textContent = label;
         countrySelect.appendChild(option);
+        countryLookup.set(country.code, label);
       });
+      clearMultiSelect(countrySelect);
     }
     
-    // Populate genre dropdown
-    const genreSelect = document.getElementById('genre');
-    if (genreSelect && options.genres) {
-      genreSelect.innerHTML = '<option value="">All Genres</option>';
-      options.genres.forEach(genre => {
-        const option = document.createElement('option');
-        option.value = genre;
-        option.textContent = genre;
-        genreSelect.appendChild(option);
-      });
+    const popMinInput = document.getElementById('popMin');
+    const popMaxInput = document.getElementById('popMax');
+    if (options.popularity_range && popMinInput && popMaxInput) {
+      const { min, max } = options.popularity_range;
+      popMinInput.min = min;
+      popMinInput.max = max;
+      popMinInput.value = min;
+      popMaxInput.min = min;
+      popMaxInput.max = max;
+      popMaxInput.value = max;
+      defaultFilters.popMin = String(min);
+      defaultFilters.popMax = String(max);
     }
     
-    // Populate other dropdowns similarly...
-    showSuccessState('Filter options loaded successfully!');
+    const releaseStartInput = document.getElementById('releaseStart');
+    const releaseEndInput = document.getElementById('releaseEnd');
+    if (options.date_range && releaseStartInput && releaseEndInput) {
+      const { start, end } = options.date_range;
+      releaseStartInput.min = start;
+      releaseStartInput.max = end;
+      releaseStartInput.value = start;
+      releaseEndInput.min = start;
+      releaseEndInput.max = end;
+      releaseEndInput.value = end;
+      defaultFilters.releaseStart = releaseStartInput.value || null;
+      defaultFilters.releaseEnd = releaseEndInput.value || null;
+    } else {
+      defaultFilters.releaseStart = null;
+      defaultFilters.releaseEnd = null;
+    }
     
   } catch (error) {
     console.error('Failed to load filter options:', error);
-    showErrorState(`Failed to load filters: ${error.message}`);
   }
 }
 
+let updateRequestId = 0;
+
 async function updateCharts() {
   try {
+    const requestId = ++updateRequestId;
     console.log('Starting insightful chart update...');
-    showLoadingState('Generating insightful analytics...');
     
     // Get current filters and fetch insightful chart data
     const filters = getCurrentFilters();
-    const url = `/api/chart-data?${new URLSearchParams(filters).toString()}`;
+    const queryString = filters.toString();
+    const querySuffix = queryString ? `?${queryString}` : '';
     
-    console.log('🔄 Fetching insightful charts from:', url);
-    const response = await fetchWithCache(url);
-    const result = await response.json();
+    console.log('🔄 Fetching insightful charts from:', `/api/chart-data${querySuffix}`);
     
-    if (result.status === 'error') {
-      showErrorState(result.message || 'Error loading charts');
+    const chartPromise = fetchWithCache(`/api/chart-data${querySuffix}`).then(response => response.json());
+    const kpiPromise = fetchWithCache(`/api/filtered-data${querySuffix}`).then(response => response.json());
+    
+    const [chartsOutcome, kpiOutcome] = await Promise.allSettled([chartPromise, kpiPromise]);
+    
+    if (requestId !== updateRequestId) {
+      console.warn('Stale chart update discarded before processing results');
       return;
     }
     
-    const chartsData = result.data;
+    if (chartsOutcome.status === 'rejected') {
+      console.error('❌ Error fetching charts:', chartsOutcome.reason);
+      return;
+    }
+    
+    const chartsResult = chartsOutcome.value;
+    if (chartsResult.status === 'error') {
+      console.error('Error loading charts:', chartsResult.message);
+      return;
+    }
+    
+    const chartsData = chartsResult.data;
+    const chartMetadata = chartsResult.metadata || {};
+    const filtersApplied = chartMetadata.filters_applied || {};
+    const datasetSize = chartMetadata.dataset_size;
     
     // Render the new insightful charts
     renderInsightfulCharts(chartsData);
     
-    // Show success message with insights
-    const chartCount = Object.keys(chartsData).length;
-    showSuccessState(`${chartCount} insightful analytics charts generated!`);
+    if (requestId !== updateRequestId) {
+      console.warn('Stale KPI update discarded');
+      return;
+    }
+    
+    if (kpiOutcome.status === 'fulfilled') {
+      const kpiResult = kpiOutcome.value;
+      if (kpiResult?.status === 'success' && kpiResult?.data?.kpis) {
+        updateKpis(kpiResult.data.kpis);
+      } else if (kpiResult?.status === 'error') {
+        console.warn('⚠️ KPI update failed:', kpiResult.message || 'Unknown KPI error');
+      }
+    } else {
+      console.warn('⚠️ KPI fetch failed:', kpiOutcome.reason);
+    }
     
   } catch (error) {
     console.error('❌ Error updating charts:', error);
-    showErrorState('Failed to load chart data');
   }
 }
 
 function setupEventListeners() {
   // Add event listeners to all filter elements
   const filterElements = [
-    'country', 'genre', 'subgenre', 'language', 
-    'popMin', 'popMax', 'releaseStart', 'releaseEnd', 'trend'
+    'country', 'popMin', 'popMax', 'releaseStart', 'releaseEnd', 'trend'
   ];
   
   filterElements.forEach(id => {
@@ -1272,15 +1489,28 @@ function setupEventListeners() {
   if (resetButton) {
     resetButton.addEventListener('click', () => {
       // Reset all filters
-      document.getElementById('country').selectedIndex = -1;
-      document.getElementById('genre').value = '';
-      document.getElementById('subgenre').value = '';
-      document.getElementById('language').value = '';
-      document.getElementById('popMin').value = document.getElementById('popMin').min;
-      document.getElementById('popMax').value = document.getElementById('popMax').max;
-      document.getElementById('releaseStart').value = '';
-      document.getElementById('releaseEnd').value = '';
-      document.getElementById('trend').value = '';
+      clearMultiSelect(document.getElementById('country'));
+      
+      const popMinInput = document.getElementById('popMin');
+      if (popMinInput) {
+        popMinInput.value = defaultFilters.popMin ?? popMinInput.min ?? '';
+      }
+      const popMaxInput = document.getElementById('popMax');
+      if (popMaxInput) {
+        popMaxInput.value = defaultFilters.popMax ?? popMaxInput.max ?? '';
+      }
+      const releaseStartInput = document.getElementById('releaseStart');
+      if (releaseStartInput) {
+        releaseStartInput.value = defaultFilters.releaseStart ?? '';
+      }
+      const releaseEndInput = document.getElementById('releaseEnd');
+      if (releaseEndInput) {
+        releaseEndInput.value = defaultFilters.releaseEnd ?? '';
+      }
+      const trendSelect = document.getElementById('trend');
+      if (trendSelect) {
+        trendSelect.value = '';
+      }
       
       // Clear cache when resetting
       apiCache.clear();

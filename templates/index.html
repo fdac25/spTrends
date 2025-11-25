@@ -31,27 +31,6 @@
     </label>
 
 
-    <label>Genre
-      <select name="genre" id="genre">
-        <option value="">All</option>
-        <!-- Options will be populated dynamically -->
-      </select>
-    </label>
-
-    <label>Subgenre
-      <select name="subgenre" id="subgenre">
-        <option value="">All</option>
-        <!-- Options will be populated dynamically -->
-      </select>
-    </label>
-
-    <label>Language
-      <select name="language" id="language">
-        <option value="">All</option>
-        <!-- Options will be populated dynamically -->
-      </select>
-    </label>
-
     <label>Popularity Range
       <div class="range-wrap">
         <input type="number" id="popMin" name="popMin" min="0" max="100" value="0" />
@@ -97,16 +76,12 @@
 
   <main class="page">
     <section class="kpis">
-      <div class="card kpi"><div class="kpi-label">Total Tracks</div><div class="kpi-value">{{ kpis.total_tracks }}</div></div>
-      <div class="card kpi"><div class="kpi-label">Avg Energy</div><div class="kpi-value">{{ kpis.avg_energy }}</div></div>
-      <div class="card kpi"><div class="kpi-label">Avg Danceability</div><div class="kpi-value">{{ kpis.avg_danceability }}</div></div>
-      <div class="card kpi"><div class="kpi-label">Countries Covered</div><div class="kpi-value">{{ kpis.countries_covered }}</div></div>
-      <div class="card kpi"><div class="kpi-label">Last Snapshot</div><div class="kpi-value">{{ kpis.last_ingest }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Total Tracks</div><div class="kpi-value" data-kpi="total_tracks">{{ kpis.total_tracks }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Avg Energy</div><div class="kpi-value" data-kpi="avg_energy">{{ kpis.avg_energy }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Avg Danceability</div><div class="kpi-value" data-kpi="avg_danceability">{{ kpis.avg_danceability }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Countries Covered</div><div class="kpi-value" data-kpi="countries_covered">{{ kpis.countries_covered }}</div></div>
+      <div class="card kpi"><div class="kpi-label">Last Snapshot</div><div class="kpi-value" data-kpi="last_ingest">{{ kpis.last_ingest }}</div></div>
     </section>
-
-    <div id="filter-status" style="padding: 10px; background: var(--card); margin: 10px 0; border-radius: var(--radius); color: var(--text);">
-      Loading filters...
-    </div>
 
     <section id="charts-container" class="grid"></section>
 
